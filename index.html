@@ -3,6 +3,10 @@
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta
+		http-equiv="Content-Security-Policy"
+		content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self' https://photon.komoot.io; img-src 'none'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+	>
 	<title>Adressinator</title>
 	<link rel="stylesheet" href="css/style.css">
 </head>
@@ -60,6 +64,10 @@
 				<h2 class="history__title">Verlauf</h2>
 				<button type="button" id="clear-history-btn" class="btn btn--ghost" hidden>Verlauf leeren</button>
 			</div>
+			<label class="history__option">
+				<input type="checkbox" id="clear-on-exit">
+				Verlauf beim Beenden löschen
+			</label>
 			<p id="history-empty" class="history__empty">Noch keine Adressen ausgewählt.</p>
 			<ul id="history-list" class="history__list" hidden></ul>
 		</section>

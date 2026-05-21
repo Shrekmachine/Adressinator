@@ -6,6 +6,7 @@ const SUGGESTION_LIMIT = 10;
 const PHOTON_FETCH_LIMIT = 30;
 const MAX_HISTORY = 25;
 const HISTORY_STORAGE_KEY = "adressinator-history";
+const CLEAR_ON_EXIT_KEY = "adressinator-clear-on-exit";
 /** Deutschland (minLon, minLat, maxLon, maxLat) */
 const DE_BBOX = "5.87,47.27,15.04,55.06";
 
@@ -20,6 +21,7 @@ const copyBtn = document.getElementById("copy-btn");
 const historyListEl = document.getElementById("history-list");
 const historyEmptyEl = document.getElementById("history-empty");
 const clearHistoryBtn = document.getElementById("clear-history-btn");
+const clearOnExitCheckbox = document.getElementById("clear-on-exit");
 
 let debounceTimer = null;
 let activeIndex = -1;
@@ -38,7 +40,10 @@ suggestionsEl.addEventListener("mousedown", (e) => {
 resetBtn.addEventListener("click", resetForm);
 copyBtn.addEventListener("click", copyAddress);
 clearHistoryBtn.addEventListener("click", clearHistory);
+clearOnExitCheckbox.addEventListener("change", onClearOnExitChange);
+window.addEventListener("pagehide", clearHistoryOnExitIfEnabled);
 
+initClearOnExit();
 renderHistory();
 
 function onInput() {
@@ -499,6 +504,25 @@ function removeFromHistory(key) {
 	history = history.filter((h) => h.key !== key);
 	saveHistory();
 	renderHistory();
+}
+
+function initClearOnExit() {
+	clearOnExitCheckbox.checked = isClearOnExitEnabled();
+}
+
+function isClearOnExitEnabled() {
+	return localStorage.getItem(CLEAR_ON_EXIT_KEY) === "1";
+}
+
+function onClearOnExitChange() {
+	localStorage.setItem(CLEAR_ON_EXIT_KEY, clearOnExitCheckbox.checked ? "1" : "0");
+}
+
+function clearHistoryOnExitIfEnabled() {
+	if (!isClearOnExitEnabled()) {
+		return;
+	}
+	localStorage.removeItem(HISTORY_STORAGE_KEY);
 }
 
 function clearHistory() {

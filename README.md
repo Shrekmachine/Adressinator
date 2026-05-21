@@ -8,6 +8,7 @@ Statische Web-App zur Adresssuche mit Autovervollständigung für Deutschland. V
 - Übernahme in **Straße und Nummer**, **PLZ** und **Stadt**
 - **Kopieren** der drei Felder in die Zwischenablage (zeilenweise)
 - **Verlauf** der zuletzt gewählten Adressen (lokal im Browser, max. 25 Einträge)
+- Optional: **Verlauf beim Beenden löschen** (Tab schließen / Seite verlassen)
 - Kopieren und erneutes Laden aus dem Verlauf
 - **Zurücksetzen** der aktuellen Eingabe
 
@@ -29,11 +30,29 @@ Es werden nur statische Dateien benötigt:
 index.html
 css/style.css
 js/app.js
+.htaccess          # optional, nur bei Apache-Hosting
 ```
 
 Auf jedem Webhosting mit HTTPS deployen (z. B. Unterordner oder Subdomain). Relative Pfade in `index.html` erlauben den Betrieb in einem Unterverzeichnis.
 
 **Hinweis:** Die Zwischenablage funktioniert im Browser zuverlässig nur über **HTTPS** (oder `localhost`).
+
+## Sicherheit (Content-Security-Policy)
+
+Die App setzt eine **CSP** — eine Whitelist, was der Browser laden und ausführen darf:
+
+| Richtlinie | Erlaubt |
+|------------|---------|
+| `script-src`, `style-src` | nur eigene Dateien (`js/app.js`, `css/style.css`) |
+| `connect-src` | eigene Origin + `https://photon.komoot.io` (Adresssuche) |
+| `frame-ancestors 'none'` | Seite darf nicht in fremde iframes eingebettet werden |
+
+**Zwei Varianten** (Inhalt identisch — eine reicht):
+
+1. **`index.html`** — `<meta http-equiv="Content-Security-Policy" …>` (funktioniert überall, z. B. GitHub Pages)
+2. **`.htaccess`** — HTTP-Header (Apache mit `mod_headers`, z. B. viele Strato-Pakete)
+
+Nach dem Upload testen: Seite öffnen, Adresse suchen, kopieren. Bei blockierten Ressourcen zeigt die Browser-Konsole (F12) einen CSP-Fehler.
 
 ## Technik
 
