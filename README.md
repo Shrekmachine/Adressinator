@@ -28,6 +28,11 @@ Es werden nur statische Dateien benötigt:
 
 ```
 index.html
+favicon.ico
+assets/logo.png
+assets/favicon-16.png
+assets/favicon-32.png
+assets/apple-touch-icon.png
 css/style.css
 js/app.js
 .htaccess          # optional, nur bei Apache-Hosting
@@ -45,6 +50,7 @@ Die App setzt eine **CSP** — eine Whitelist, was der Browser laden und ausfüh
 |------------|---------|
 | `script-src`, `style-src` | nur eigene Dateien (`js/app.js`, `css/style.css`) |
 | `connect-src` | eigene Origin + `https://photon.komoot.io` (Adresssuche) |
+| `img-src` | eigene Origin (Logo) |
 | `frame-ancestors 'none'` | Seite darf nicht in fremde iframes eingebettet werden |
 
 **Zwei Varianten** (Inhalt identisch — eine reicht):

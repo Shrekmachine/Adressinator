@@ -2,5 +2,5 @@
 # Erfordert mod_headers. Falls der Hoster nur Nginx nutzt: CSP über index.html (meta) oder Panel setzen.
 
 <IfModule mod_headers.c>
-	Header set Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self' https://photon.komoot.io; img-src 'none'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+	Header set Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self' https://photon.komoot.io; img-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
 </IfModule>

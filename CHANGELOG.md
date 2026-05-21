@@ -4,6 +4,17 @@ Alle wesentlichen Änderungen an Adressinator werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [1.3.0] — 2026-05-22
+
+### Hinzugefügt
+
+- App-**Logo** im Seitenkopf
+- **Favicon** (`favicon.ico`, PNG-Varianten, Apple Touch Icon)
+
+### Geändert
+
+- CSP: `img-src 'self'` für Logo und Icons
+
 ## [1.2.0] — 2026-05-22
 
 ### Hinzugefügt

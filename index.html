@@ -5,16 +5,25 @@
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<meta
 		http-equiv="Content-Security-Policy"
-		content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self' https://photon.komoot.io; img-src 'none'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+		content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self' https://photon.komoot.io; img-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
 	>
 	<title>Adressinator</title>
+	<link rel="icon" href="favicon.ico" sizes="any">
+	<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+	<link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16.png">
+	<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
 	<link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 	<main class="app">
 		<header class="app__header">
-			<h1>Adressinator</h1>
-			<p class="app__lead">Adresse oder Teile davon eingeben — Vorschläge stammen aus OpenStreetMap.</p>
+			<div class="app__brand">
+				<img src="assets/logo.png" alt="" width="48" height="48" class="app__logo" decoding="async">
+				<div class="app__brand-text">
+					<h1>Adressinator</h1>
+					<p class="app__lead">Adresse oder Teile davon eingeben — Vorschläge stammen aus OpenStreetMap.</p>
+				</div>
+			</div>
 		</header>
 
 		<section class="search" aria-label="Adresssuche">
