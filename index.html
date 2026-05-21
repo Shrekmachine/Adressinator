@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Adressinator</title>
+	<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+	<main class="app">
+		<header class="app__header">
+			<h1>Adressinator</h1>
+			<p class="app__lead">Adresse oder Teile davon eingeben — Vorschläge stammen aus OpenStreetMap.</p>
+		</header>
+
+		<section class="search" aria-label="Adresssuche">
+			<label class="search__label" for="address-query">Adresse suchen</label>
+			<div class="search__field">
+				<input
+					type="search"
+					id="address-query"
+					class="search__input"
+					autocomplete="off"
+					placeholder="z. B. Hauptstraße 12, 70173 Stuttgart"
+					aria-autocomplete="list"
+					aria-controls="suggestions"
+					aria-expanded="false"
+				>
+				<ul id="suggestions" class="suggestions" role="listbox" hidden></ul>
+			</div>
+			<p id="search-status" class="search__status" aria-live="polite"></p>
+		</section>
+
+		<section class="result" aria-label="Ausgewählte Adresse">
+			<div class="result__head">
+				<h2 class="result__title">Ausgewählte Adresse</h2>
+				<div class="result__actions">
+					<button type="button" id="copy-btn" class="btn btn--primary" disabled>Kopieren</button>
+					<button type="button" id="reset-btn" class="btn btn--secondary">Zurücksetzen</button>
+				</div>
+			</div>
+			<div class="result__grid">
+				<div class="field">
+					<label class="field__label" for="street">Straße und Nummer</label>
+					<input type="text" id="street" class="field__input" readonly>
+				</div>
+				<div class="field field--plz">
+					<label class="field__label" for="plz">PLZ</label>
+					<input type="text" id="plz" class="field__input" readonly>
+				</div>
+				<div class="field field--stadt">
+					<label class="field__label" for="stadt">Stadt</label>
+					<input type="text" id="stadt" class="field__input" readonly>
+				</div>
+			</div>
+		</section>
+
+		<section class="history" aria-label="Verlauf">
+			<div class="history__head">
+				<h2 class="history__title">Verlauf</h2>
+				<button type="button" id="clear-history-btn" class="btn btn--ghost" hidden>Verlauf leeren</button>
+			</div>
+			<p id="history-empty" class="history__empty">Noch keine Adressen ausgewählt.</p>
+			<ul id="history-list" class="history__list" hidden></ul>
+		</section>
+	</main>
+
+	<script src="js/app.js" type="module"></script>
+</body>
+</html>
