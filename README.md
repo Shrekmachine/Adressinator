@@ -67,6 +67,10 @@ Nach dem Upload testen: Seite öffnen, Adresse suchen, kopieren. Bei blockierten
 - Datenqualität hängt von OpenStreetMap ab; nicht jede Hausnummer ist erfasst
 - Keine Daten werden an einen eigenen Server gesendet
 
+## Changelog
+
+Änderungshistorie: [CHANGELOG.md](CHANGELOG.md)
+
 ## Lizenz
 
 MIT — siehe [LICENSE](LICENSE).
