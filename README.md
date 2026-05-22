@@ -7,6 +7,8 @@ Statische Web-App zur Adresssuche mit Autovervollständigung für Deutschland. V
 - Adresse oder Teile davon eingeben; bis zu 10 Vorschläge während der Eingabe
 - Übernahme in **Straße und Nummer**, **PLZ** und **Stadt**
 - **Kopieren** der drei Felder in die Zwischenablage (zeilenweise)
+- **Startadressen** — Modus „Start“ in derselben Adresssuche, Auswahl im Dropdown (persistent), **Route** zum Ziel; aus dem Verlauf per **Start** übernehmen
+- **Ziel in Maps** — ausgewählte Zieladresse ohne Route anzeigen (Koordinaten von OSM, sonst Textsuche)
 - **Verlauf** der zuletzt gewählten Adressen (lokal im Browser, max. 25 Einträge)
 - Optional: **Verlauf beim Beenden löschen** (Tab schließen / Seite verlassen)
 - Kopieren und erneutes Laden aus dem Verlauf
@@ -64,7 +66,7 @@ Nach dem Upload testen: Seite öffnen, Adresse suchen, kopieren. Bei blockierten
 
 - Vanilla HTML, CSS und JavaScript (ES-Module)
 - Geocoding: `https://photon.komoot.io/api/`
-- Verlauf: `localStorage` im Browser
+- Verlauf und Startadressen: `localStorage` im Browser
 - Suche auf Deutschland begrenzt (`bbox`)
 
 ## Hinweise

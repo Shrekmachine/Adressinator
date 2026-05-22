@@ -21,67 +21,108 @@
 				<img src="assets/logo.png" alt="" width="48" height="48" class="app__logo" decoding="async">
 				<div class="app__brand-text">
 					<h1>Adressinator</h1>
-					<p class="app__lead">Adresse oder Teile davon eingeben — Vorschläge stammen aus OpenStreetMap.</p>
+					<p class="app__lead">Personalisierte Fuzzysuche und Ziel-/Routenplanung. Vorschläge stammen aus OpenStreetMap. <br>Vorteil: Weniger Spuren auf Google Maps während Recherche.</p>
 				</div>
 			</div>
 		</header>
 
-		<section class="search" aria-label="Adresssuche">
-			<label class="search__label" for="address-query">Adresse suchen</label>
-			<div class="search__field">
-				<input
-					type="search"
-					id="address-query"
-					class="search__input"
-					role="combobox"
-					autocomplete="off"
-					placeholder="z. B. Hauptstraße 12, 70173 Stuttgart"
-					aria-autocomplete="list"
-					aria-controls="suggestions"
-					aria-expanded="false"
-					aria-haspopup="listbox"
-				>
-				<ul id="suggestions" class="suggestions" role="listbox" hidden></ul>
-			</div>
-			<p id="search-status" class="search__status" aria-live="polite"></p>
-		</section>
+		<div class="app__panels">
+		<div class="layout-search">
+			<section class="search panel" aria-label="Adresssuche">
+				<fieldset class="search__mode">
+					<legend class="search__mode-legend">Suchmodus</legend>
+					<label class="search__mode-option">
+						<input type="radio" name="search-mode" value="destination" checked>
+						Ziel
+					</label>
+					<label class="search__mode-option">
+						<input type="radio" name="search-mode" value="start">
+						Start
+					</label>
+				</fieldset>
+				<label class="search__label" id="search-label" for="address-query">Zieladresse suchen</label>
+				<div class="search__field">
+					<input
+						type="search"
+						id="address-query"
+						class="search__input"
+						role="combobox"
+						autocomplete="off"
+						placeholder="z. B. Hauptstraße 12, 70173 Stuttgart"
+						aria-autocomplete="list"
+						aria-controls="suggestions"
+						aria-expanded="false"
+						aria-haspopup="listbox"
+					>
+					<ul id="suggestions" class="suggestions" role="listbox" hidden></ul>
+				</div>
+				<p id="search-status" class="search__status" aria-live="polite"></p>
+			</section>
 
-		<section class="result" aria-label="Ausgewählte Adresse">
-			<div class="result__head">
-				<h2 class="result__title">Ausgewählte Adresse</h2>
+			<section class="history panel" aria-label="Verlauf">
+				<div class="history__head">
+					<h2 class="history__title">Verlauf</h2>
+					<button type="button" id="clear-history-btn" class="btn btn--ghost" hidden>Leeren</button>
+				</div>
+				<label class="history__option">
+					<input type="checkbox" id="clear-on-exit">
+					Beim Beenden löschen
+				</label>
+				<p id="history-empty" class="history__empty">Noch keine Adressen ausgewählt.</p>
+				<ul id="history-list" class="history__list" hidden></ul>
+			</section>
+		</div>
+
+		<div class="layout-addresses">
+			<section class="starts panel" aria-label="Startadresse">
+				<h2 class="panel__title starts__title">Startadresse</h2>
+				<p class="starts__hint">Modus „Start“ in der Suche oder „Start“ im Verlauf.</p>
+				<label class="search__label" for="start-select">Gespeicherte Startadresse</label>
+				<div class="starts__row">
+					<select id="start-select" class="starts__select" disabled>
+						<option value="">Noch keine Startadressen</option>
+					</select>
+					<button type="button" id="route-btn" class="btn btn--secondary" disabled>Route</button>
+				</div>
+				<button type="button" id="remove-start-btn" class="btn btn--ghost" hidden>Aus Liste entfernen</button>
+			</section>
+
+			<section class="result panel" aria-label="Zieladresse">
+				<h2 class="panel__title result__title">Zieladresse</h2>
+				<div class="result__grid">
+					<div class="field">
+						<label class="field__label" for="street">Straße und Nummer</label>
+						<input type="text" id="street" class="field__input" readonly>
+					</div>
+					<div class="field field--plz">
+						<label class="field__label" for="plz">PLZ</label>
+						<input type="text" id="plz" class="field__input" readonly>
+					</div>
+					<div class="field field--stadt">
+						<label class="field__label" for="stadt">Stadt</label>
+						<input type="text" id="stadt" class="field__input" readonly>
+					</div>
+				</div>
 				<div class="result__actions">
-					<button type="button" id="copy-btn" class="btn btn--primary" disabled>Kopieren</button>
+					<button type="button" id="copy-btn" class="btn btn--secondary" disabled>In Zwischenablage</button>
+					<button type="button" id="save-start-btn" class="btn btn--secondary" hidden>Als Start speichern</button>
+					<a
+						id="maps-link"
+						class="btn btn--secondary"
+						href="#"
+						target="_blank"
+						rel="noopener noreferrer"
+						hidden
+					>Ziel in Maps</a>
 					<button type="button" id="reset-btn" class="btn btn--secondary">Zurücksetzen</button>
 				</div>
-			</div>
-			<div class="result__grid">
-				<div class="field">
-					<label class="field__label" for="street">Straße und Nummer</label>
-					<input type="text" id="street" class="field__input" readonly>
-				</div>
-				<div class="field field--plz">
-					<label class="field__label" for="plz">PLZ</label>
-					<input type="text" id="plz" class="field__input" readonly>
-				</div>
-				<div class="field field--stadt">
-					<label class="field__label" for="stadt">Stadt</label>
-					<input type="text" id="stadt" class="field__input" readonly>
-				</div>
-			</div>
-		</section>
+			</section>
+		</div>
+		</div>
 
-		<section class="history" aria-label="Verlauf">
-			<div class="history__head">
-				<h2 class="history__title">Verlauf</h2>
-				<button type="button" id="clear-history-btn" class="btn btn--ghost" hidden>Verlauf leeren</button>
-			</div>
-			<label class="history__option">
-				<input type="checkbox" id="clear-on-exit">
-				Verlauf beim Beenden löschen
-			</label>
-			<p id="history-empty" class="history__empty">Noch keine Adressen ausgewählt.</p>
-			<ul id="history-list" class="history__list" hidden></ul>
-		</section>
+		<footer class="app__footer">
+			<p>© 2026 Frédéric Heinemann · v1.6.0</p>
+		</footer>
 	</main>
 
 	<script src="js/app.js" type="module"></script>

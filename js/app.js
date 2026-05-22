@@ -5,12 +5,17 @@ const SUGGESTION_LIMIT = 10;
 /** Mehr von der API holen, damit nach dem Filtern oft 10 Treffer übrig bleiben */
 const PHOTON_FETCH_LIMIT = 30;
 const MAX_HISTORY = 25;
+const MAX_STARTS = 10;
 const HISTORY_STORAGE_KEY = "adressinator-history";
+const STARTS_STORAGE_KEY = "adressinator-starts";
+const SELECTED_START_KEY = "adressinator-selected-start";
 const CLEAR_ON_EXIT_KEY = "adressinator-clear-on-exit";
 /** Deutschland (minLon, minLat, maxLon, maxLat) */
 const DE_BBOX = "5.87,47.27,15.04,55.06";
 
 const queryInput = document.getElementById("address-query");
+const searchLabelEl = document.getElementById("search-label");
+const searchModeRadios = document.querySelectorAll('input[name="search-mode"]');
 const suggestionsEl = document.getElementById("suggestions");
 const statusEl = document.getElementById("search-status");
 const streetInput = document.getElementById("street");
@@ -18,6 +23,11 @@ const plzInput = document.getElementById("plz");
 const stadtInput = document.getElementById("stadt");
 const resetBtn = document.getElementById("reset-btn");
 const copyBtn = document.getElementById("copy-btn");
+const mapsLink = document.getElementById("maps-link");
+const saveStartBtn = document.getElementById("save-start-btn");
+const startSelectEl = document.getElementById("start-select");
+const routeBtn = document.getElementById("route-btn");
+const removeStartBtn = document.getElementById("remove-start-btn");
 const historyListEl = document.getElementById("history-list");
 const historyEmptyEl = document.getElementById("history-empty");
 const clearHistoryBtn = document.getElementById("clear-history-btn");
@@ -28,6 +38,11 @@ let activeIndex = -1;
 let currentSuggestions = [];
 let abortController = null;
 let history = loadHistory();
+let starts = loadStarts();
+let selectedStartKey = loadSelectedStartKey();
+let searchMode = "destination";
+let selectedLat = null;
+let selectedLon = null;
 
 queryInput.addEventListener("input", onInput);
 queryInput.addEventListener("keydown", onKeyDown);
@@ -39,11 +54,21 @@ suggestionsEl.addEventListener("mousedown", (e) => {
 });
 resetBtn.addEventListener("click", resetForm);
 copyBtn.addEventListener("click", copyAddress);
+saveStartBtn.addEventListener("click", saveCurrentAsStart);
+searchModeRadios.forEach((radio) => {
+	radio.addEventListener("change", onSearchModeChange);
+});
+startSelectEl.addEventListener("change", onStartSelectChange);
+routeBtn.addEventListener("click", openRouteWithSelectedStart);
+removeStartBtn.addEventListener("click", removeSelectedStart);
 clearHistoryBtn.addEventListener("click", clearHistory);
 clearOnExitCheckbox.addEventListener("change", onClearOnExitChange);
 window.addEventListener("pagehide", clearHistoryOnExitIfEnabled);
 
 initClearOnExit();
+syncSelectedStartKey();
+updateSearchModeUi();
+renderStartSelect();
 renderHistory();
 
 function onInput() {
@@ -61,13 +86,7 @@ function onInput() {
 	debounceTimer = setTimeout(() => searchAddresses(q), delay);
 }
 
-async function searchAddresses(q) {
-	if (abortController) {
-		abortController.abort();
-	}
-	abortController = new AbortController();
-	showSuggestionsLoading();
-
+async function fetchPhotonSuggestions(q, signal) {
 	const params = new URLSearchParams({
 		q,
 		limit: String(PHOTON_FETCH_LIMIT),
@@ -75,26 +94,35 @@ async function searchAddresses(q) {
 		bbox: DE_BBOX,
 	});
 
+	const res = await fetch(`${PHOTON_API}?${params}`, {
+		signal,
+		headers: { Accept: "application/json" },
+	});
+
+	if (!res.ok) {
+		throw new Error(`HTTP ${res.status}`);
+	}
+
+	const data = await res.json();
+	return (data.features || [])
+		.map(normalizeFeature)
+		.filter(isSuggestionCandidate)
+		.filter((item, i, arr) => arr.findIndex((x) => x.key === item.key) === i)
+		.sort(compareSuggestionRank)
+		.slice(0, SUGGESTION_LIMIT);
+}
+
+async function searchAddresses(q) {
+	if (abortController) {
+		abortController.abort();
+	}
+	abortController = new AbortController();
+	showSuggestionsLoading();
+
 	try {
-		const res = await fetch(`${PHOTON_API}?${params}`, {
-			signal: abortController.signal,
-			headers: { Accept: "application/json" },
-		});
-
-		if (!res.ok) {
-			throw new Error(`HTTP ${res.status}`);
-		}
-
-		const data = await res.json();
-		const items = (data.features || [])
-			.map(normalizeFeature)
-			.filter(isSuggestionCandidate)
-			.filter((item, i, arr) => arr.findIndex((x) => x.key === item.key) === i)
-			.sort(compareSuggestionRank)
-			.slice(0, SUGGESTION_LIMIT);
-
+		const items = await fetchPhotonSuggestions(q, abortController.signal);
 		currentSuggestions = items;
-		renderSuggestions(items, q);
+		renderSuggestionList(items, q);
 		setStatus(
 			items.length
 				? `${items.length} von max. ${SUGGESTION_LIMIT} Treffern`
@@ -108,6 +136,24 @@ async function searchAddresses(q) {
 		setStatus("Suche fehlgeschlagen. Bitte später erneut versuchen.");
 		console.error(err);
 	}
+}
+
+function onSearchModeChange() {
+	searchMode =
+		document.querySelector('input[name="search-mode"]:checked')?.value ||
+		"destination";
+	updateSearchModeUi();
+	queryInput.focus();
+}
+
+function updateSearchModeUi() {
+	const isStart = searchMode === "start";
+	searchLabelEl.textContent = isStart
+		? "Startadresse suchen"
+		: "Zieladresse suchen";
+	queryInput.placeholder = isStart
+		? "z.\u202fB. Büro, Lager, Zuhause"
+		: "z.\u202fB. Hauptstraße 12, 70173 Stuttgart";
 }
 
 function normalizeFeature(feature) {
@@ -140,6 +186,10 @@ function normalizeFeature(feature) {
 		streetLine = "";
 	}
 
+	const coords = feature.geometry?.coordinates;
+	const lon = Number.isFinite(coords?.[0]) ? coords[0] : null;
+	const lat = Number.isFinite(coords?.[1]) ? coords[1] : null;
+
 	return {
 		key: [streetLine, plz, stadt, p.osm_id].filter(Boolean).join("|"),
 		label,
@@ -148,6 +198,8 @@ function normalizeFeature(feature) {
 		stadt,
 		type: p.type,
 		osm_key: p.osm_key,
+		lat,
+		lon,
 	};
 }
 
@@ -272,7 +324,7 @@ function showSuggestionsLoading() {
 	queryInput.setAttribute("aria-expanded", "true");
 }
 
-function renderSuggestions(items, query) {
+function renderSuggestionList(items, query) {
 	suggestionsEl.innerHTML = "";
 	activeIndex = -1;
 
@@ -334,6 +386,16 @@ function selectSuggestion(index) {
 	if (!item) {
 		return;
 	}
+
+	if (searchMode === "start") {
+		if (addStartFromItem(item)) {
+			setStatus("Startadresse gespeichert und ausgewählt.");
+		}
+		queryInput.value = "";
+		hideSuggestions();
+		return;
+	}
+
 	applyAddress(item);
 	addToHistory(item);
 }
@@ -347,9 +409,24 @@ function applyAddress(item) {
 	plzInput.value = item.plz;
 	stadtInput.value = item.stadt;
 	queryInput.value = item.label;
+	selectedLat = item.lat ?? null;
+	selectedLon = item.lon ?? null;
 	hideSuggestions();
-	updateCopyButton();
+	updateResultActions();
+	renderHistory();
 	setStatus(street ? "Adresse übernommen." : "Ort übernommen — Straße bitte ergänzen.");
+}
+
+function applyAddressFromHistory(entry) {
+	applyAddress({
+		...entry,
+		type: "house",
+	});
+	setStatus(`Ziel: ${entry.label}`);
+}
+
+function isCurrentDestination(entry) {
+	return queryInput.value.trim() === (entry.label || "").trim();
 }
 
 function resetForm() {
@@ -361,8 +438,11 @@ function resetForm() {
 	streetInput.value = "";
 	plzInput.value = "";
 	stadtInput.value = "";
+	selectedLat = null;
+	selectedLon = null;
 	hideSuggestions();
-	updateCopyButton();
+	updateResultActions();
+	renderHistory();
 	setStatus("");
 	queryInput.focus();
 }
@@ -389,8 +469,342 @@ function hasAddressToCopy() {
 	return hasEntryToCopy(streetInput.value, plzInput.value, stadtInput.value);
 }
 
-function updateCopyButton() {
-	copyBtn.disabled = !hasAddressToCopy();
+function formatMapsLocation(street, plz, stadt, lat, lon, label = "") {
+	if (lat != null && lon != null) {
+		return `${lat},${lon}`;
+	}
+
+	const query = [street, plz, stadt]
+		.map((v) => (v || "").trim())
+		.filter(Boolean)
+		.join(", ");
+
+	if (query) {
+		return query;
+	}
+
+	return (label || "").trim() || null;
+}
+
+function buildGoogleMapsUrl(street, plz, stadt, lat, lon) {
+	const location = formatMapsLocation(street, plz, stadt, lat, lon);
+	if (!location) {
+		return null;
+	}
+
+	if (lat != null && lon != null) {
+		return `https://www.google.com/maps?q=${encodeURIComponent(location)}`;
+	}
+
+	return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`;
+}
+
+function buildDirectionsUrl(origin, destination) {
+	const originParam = formatMapsLocation(
+		origin.street,
+		origin.plz,
+		origin.stadt,
+		origin.lat,
+		origin.lon,
+		origin.label
+	);
+	const destParam = formatMapsLocation(
+		destination.street,
+		destination.plz,
+		destination.stadt,
+		destination.lat,
+		destination.lon,
+		destination.label
+	);
+
+	if (!originParam || !destParam) {
+		return null;
+	}
+
+	/* api=1 erfordert origin/destination als Query-Parameter (nicht /dir/A/B im Pfad) */
+	const url = new URL("https://www.google.com/maps/dir/");
+	url.searchParams.set("api", "1");
+	url.searchParams.set("origin", originParam);
+	url.searchParams.set("destination", destParam);
+	url.searchParams.set("travelmode", "driving");
+	return url.toString();
+}
+
+function getCurrentDestination() {
+	return {
+		street: streetInput.value,
+		plz: plzInput.value,
+		stadt: stadtInput.value,
+		lat: selectedLat,
+		lon: selectedLon,
+		label: queryInput.value.trim(),
+	};
+}
+
+function getGoogleMapsLink() {
+	const start = getSelectedStart();
+	const destination = getCurrentDestination();
+
+	if (start && hasDestination()) {
+		const routeUrl = buildDirectionsUrl(start, destination);
+		if (routeUrl) {
+			return { url: routeUrl, mode: "route" };
+		}
+	}
+
+	const destUrl = buildGoogleMapsUrl(
+		destination.street,
+		destination.plz,
+		destination.stadt,
+		destination.lat,
+		destination.lon
+	);
+
+	if (destUrl) {
+		return { url: destUrl, mode: "destination" };
+	}
+
+	return null;
+}
+
+function hasDestination() {
+	return Boolean(
+		formatMapsLocation(
+			streetInput.value,
+			plzInput.value,
+			stadtInput.value,
+			selectedLat,
+			selectedLon,
+			queryInput.value.trim()
+		)
+	);
+}
+
+function createStartEntry(item) {
+	const street = isPlaceOnlyType(item.type)
+		? ""
+		: resolveStreetLine(item.street, item.label, item.plz, item.stadt);
+
+	return {
+		key: `start|${item.key}`,
+		label: item.label,
+		street,
+		plz: item.plz,
+		stadt: item.stadt,
+		lat: item.lat ?? null,
+		lon: item.lon ?? null,
+		addedAt: new Date().toISOString(),
+	};
+}
+
+function entryToStartKey(key) {
+	return key.startsWith("start|") ? key : `start|${key}`;
+}
+
+function entryToStartEntry(entry) {
+	return {
+		key: entryToStartKey(entry.key),
+		label: entry.label,
+		street: entry.street || "",
+		plz: entry.plz || "",
+		stadt: entry.stadt || "",
+		lat: entry.lat ?? null,
+		lon: entry.lon ?? null,
+		addedAt: entry.addedAt || new Date().toISOString(),
+	};
+}
+
+function loadStarts() {
+	try {
+		const raw = localStorage.getItem(STARTS_STORAGE_KEY);
+		const parsed = raw ? JSON.parse(raw) : [];
+		return Array.isArray(parsed) ? parsed : [];
+	} catch {
+		return [];
+	}
+}
+
+function loadSelectedStartKey() {
+	return localStorage.getItem(SELECTED_START_KEY) || "";
+}
+
+function saveStarts() {
+	localStorage.setItem(STARTS_STORAGE_KEY, JSON.stringify(starts));
+}
+
+function persistSelectedStartKey() {
+	if (selectedStartKey) {
+		localStorage.setItem(SELECTED_START_KEY, selectedStartKey);
+	} else {
+		localStorage.removeItem(SELECTED_START_KEY);
+	}
+}
+
+function syncSelectedStartKey() {
+	if (selectedStartKey && !starts.some((s) => s.key === selectedStartKey)) {
+		selectedStartKey = starts[0]?.key || "";
+		persistSelectedStartKey();
+	}
+}
+
+function setSelectedStartKey(key) {
+	selectedStartKey = key || "";
+	persistSelectedStartKey();
+	renderStartSelect();
+	updateResultActions();
+}
+
+function getSelectedStart() {
+	return starts.find((s) => s.key === selectedStartKey) || null;
+}
+
+function isSelectedStartKey(key) {
+	return selectedStartKey === entryToStartKey(key);
+}
+
+function addStartFromItem(item) {
+	const entry = createStartEntry(item);
+	const exists = starts.some((s) => s.key === entry.key);
+
+	if (!exists) {
+		if (starts.length >= MAX_STARTS) {
+			setStatus(`Maximal ${MAX_STARTS} Startadressen.`);
+			return false;
+		}
+		starts = [entry, ...starts];
+		saveStarts();
+	}
+
+	setSelectedStartKey(entry.key);
+	return true;
+}
+
+function saveCurrentAsStart() {
+	if (!hasAddressToCopy()) {
+		setStatus("Keine Adresse zum Speichern.");
+		return;
+	}
+
+	const item = {
+		key: [streetInput.value, plzInput.value, stadtInput.value, selectedLat, selectedLon]
+			.filter((v) => v != null && v !== "")
+			.join("|"),
+		label: queryInput.value.trim() || formatMapsLocation(
+			streetInput.value,
+			plzInput.value,
+			stadtInput.value,
+			selectedLat,
+			selectedLon
+		),
+		street: streetInput.value,
+		plz: plzInput.value,
+		stadt: stadtInput.value,
+		lat: selectedLat,
+		lon: selectedLon,
+		type: "house",
+	};
+
+	if (addStartFromItem(item)) {
+		setStatus("Als Startadresse gespeichert und ausgewählt.");
+	}
+}
+
+function setAsStartFromHistory(entry) {
+	if (addStartFromItem(entryToStartEntry(entry))) {
+		setStatus(`Startadresse: ${entry.label}`);
+	}
+}
+
+function onStartSelectChange() {
+	setSelectedStartKey(startSelectEl.value);
+	if (selectedStartKey) {
+		const start = getSelectedStart();
+		setStatus(start ? `Start: ${start.label}` : "");
+	}
+}
+
+function removeSelectedStart() {
+	if (!selectedStartKey) {
+		return;
+	}
+
+	const key = selectedStartKey;
+	starts = starts.filter((s) => s.key !== key);
+	saveStarts();
+	setSelectedStartKey(starts[0]?.key || "");
+	setStatus("Startadresse aus Liste entfernt.");
+}
+
+function openRouteWithSelectedStart() {
+	const link = getGoogleMapsLink();
+	if (!link || link.mode !== "route") {
+		setStatus("Route nicht möglich — Start und Zieladresse wählen.");
+		return;
+	}
+
+	window.open(link.url, "_blank", "noopener,noreferrer");
+	const start = getSelectedStart();
+	setStatus(`Route in Google Maps: ${start?.label || "Start"} → Ziel`);
+}
+
+function updateRouteButton() {
+	const canRoute = Boolean(getSelectedStart() && hasDestination());
+	routeBtn.disabled = !canRoute;
+	routeBtn.title = canRoute
+		? "Route in Google Maps planen"
+		: "Start und Ziel wählen";
+}
+
+function renderStartSelect() {
+	const previous = startSelectEl.value;
+	startSelectEl.innerHTML = "";
+
+	const placeholder = document.createElement("option");
+	placeholder.value = "";
+	placeholder.textContent = starts.length
+		? "— Start wählen —"
+		: "Noch keine Startadressen";
+	startSelectEl.appendChild(placeholder);
+
+	for (const entry of starts) {
+		const option = document.createElement("option");
+		option.value = entry.key;
+		option.textContent = entry.label;
+		startSelectEl.appendChild(option);
+	}
+
+	startSelectEl.disabled = !starts.length;
+	removeStartBtn.hidden = !starts.length;
+
+	syncSelectedStartKey();
+	startSelectEl.value = selectedStartKey || "";
+
+	if (!selectedStartKey && previous) {
+		startSelectEl.value = "";
+	}
+
+	updateRouteButton();
+}
+
+function updateResultActions() {
+	const hasCopy = hasAddressToCopy();
+	copyBtn.disabled = !hasCopy;
+	saveStartBtn.hidden = !hasCopy;
+
+	const maps = getGoogleMapsLink();
+
+	if (maps) {
+		mapsLink.href = maps.url;
+		mapsLink.textContent =
+			maps.mode === "route" ? "Route in Maps" : "Ziel in Maps";
+		mapsLink.hidden = false;
+	} else {
+		mapsLink.hidden = true;
+		mapsLink.removeAttribute("href");
+	}
+
+	updateRouteButton();
+	renderHistory();
 }
 
 async function copyTextToClipboard(text) {
@@ -493,6 +907,8 @@ function addToHistory(item) {
 		street,
 		plz: item.plz,
 		stadt: item.stadt,
+		lat: item.lat ?? null,
+		lon: item.lon ?? null,
 		selectedAt: new Date().toISOString(),
 	};
 	history = [entry, ...history.filter((h) => h.key !== entry.key)].slice(0, MAX_HISTORY);
@@ -548,14 +964,27 @@ function renderHistory() {
 		const li = document.createElement("li");
 		li.className = "history__item";
 
-		const pick = document.createElement("button");
-		pick.type = "button";
-		pick.className = "history__pick";
-		pick.innerHTML = `<span>${escapeHtml(entry.label)}</span><span class="history__meta">${escapeHtml(formatHistoryMeta(entry))}</span>`;
-		pick.addEventListener("click", () => applyAddress(entry));
+		const body = document.createElement("div");
+		body.className = "history__body";
+		body.innerHTML = `<span>${escapeHtml(entry.label)}</span><span class="history__meta">${escapeHtml(formatHistoryMeta(entry))}</span>`;
 
 		const tools = document.createElement("div");
 		tools.className = "history__tools";
+
+		const setZiel = document.createElement("button");
+		setZiel.type = "button";
+		setZiel.className = "history__ziel";
+		if (isCurrentDestination(entry)) {
+			setZiel.classList.add("history__ziel--active");
+			setZiel.setAttribute("aria-pressed", "true");
+		}
+		setZiel.setAttribute("aria-label", "Als Zieladresse übernehmen");
+		setZiel.title = "Als Zieladresse übernehmen";
+		setZiel.textContent = "Ziel";
+		setZiel.addEventListener("click", (e) => {
+			e.stopPropagation();
+			applyAddressFromHistory(entry);
+		});
 
 		const copy = document.createElement("button");
 		copy.type = "button";
@@ -568,6 +997,21 @@ function renderHistory() {
 			copyHistoryEntry(entry, copy);
 		});
 
+		const setStart = document.createElement("button");
+		setStart.type = "button";
+		setStart.className = "history__start";
+		if (isSelectedStartKey(entry.key)) {
+			setStart.classList.add("history__start--active");
+			setStart.setAttribute("aria-pressed", "true");
+		}
+		setStart.setAttribute("aria-label", "Als Startadresse setzen");
+		setStart.title = "Als Startadresse setzen";
+		setStart.textContent = "Start";
+		setStart.addEventListener("click", (e) => {
+			e.stopPropagation();
+			setAsStartFromHistory(entry);
+		});
+
 		const remove = document.createElement("button");
 		remove.type = "button";
 		remove.className = "history__remove";
@@ -578,8 +1022,8 @@ function renderHistory() {
 			removeFromHistory(entry.key);
 		});
 
-		tools.append(copy, remove);
-		li.append(pick, tools);
+		tools.append(setStart, setZiel, copy, remove);
+		li.append(body, tools);
 		historyListEl.appendChild(li);
 	}
 }
