@@ -1,0 +1,29 @@
+name: Deploy to Netcup
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  ftp-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@v4
+
+      - name: Per FTP zu Netcup deployen
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          local-dir: ./
+          server-dir: /fhme.de/adressinator/
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/README.md
+            **/CHANGELOG.md
+            **/LICENSE
+            **/.github/**
