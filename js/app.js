@@ -1,5 +1,8 @@
 const PHOTON_API = "https://photon.komoot.io/api/";
-const DEBOUNCE_MS = 100;
+const NOMINATIM_API = "https://nominatim.openstreetmap.org/search";
+/** Photon-Demo ist oft langsam/unerreichbar — danach Fallback auf Nominatim */
+const PHOTON_TIMEOUT_MS = 2500;
+const DEBOUNCE_MS = 250;
 const MIN_QUERY_LEN = 1;
 const SUGGESTION_LIMIT = 10;
 /** Mehr von der API holen, damit nach dem Filtern oft 10 Treffer übrig bleiben */
@@ -86,6 +89,37 @@ function onInput() {
 	debounceTimer = setTimeout(() => searchAddresses(q), delay);
 }
 
+function finalizeSuggestions(items) {
+	return items
+		.filter(isSuggestionCandidate)
+		.filter((item, i, arr) => arr.findIndex((x) => x.key === item.key) === i)
+		.sort(compareSuggestionRank)
+		.slice(0, SUGGESTION_LIMIT);
+}
+
+function withTimeoutSignal(parentSignal, ms) {
+	const controller = new AbortController();
+	const onAbort = () => controller.abort(parentSignal.reason);
+	if (parentSignal.aborted) {
+		controller.abort(parentSignal.reason);
+		return controller.signal;
+	}
+	parentSignal.addEventListener("abort", onAbort, { once: true });
+	const timer = setTimeout(() => {
+		parentSignal.removeEventListener("abort", onAbort);
+		controller.abort(new DOMException("Timeout", "AbortError"));
+	}, ms);
+	controller.signal.addEventListener(
+		"abort",
+		() => {
+			clearTimeout(timer);
+			parentSignal.removeEventListener("abort", onAbort);
+		},
+		{ once: true }
+	);
+	return controller.signal;
+}
+
 async function fetchPhotonSuggestions(q, signal) {
 	const params = new URLSearchParams({
 		q,
@@ -104,12 +138,88 @@ async function fetchPhotonSuggestions(q, signal) {
 	}
 
 	const data = await res.json();
-	return (data.features || [])
-		.map(normalizeFeature)
-		.filter(isSuggestionCandidate)
-		.filter((item, i, arr) => arr.findIndex((x) => x.key === item.key) === i)
-		.sort(compareSuggestionRank)
-		.slice(0, SUGGESTION_LIMIT);
+	return finalizeSuggestions((data.features || []).map(normalizeFeature));
+}
+
+async function fetchNominatimSuggestions(q, signal) {
+	const params = new URLSearchParams({
+		q,
+		format: "json",
+		addressdetails: "1",
+		limit: String(PHOTON_FETCH_LIMIT),
+		countrycodes: "de",
+		"accept-language": "de",
+	});
+
+	const res = await fetch(`${NOMINATIM_API}?${params}`, {
+		signal,
+		headers: { Accept: "application/json" },
+	});
+
+	if (!res.ok) {
+		throw new Error(`HTTP ${res.status}`);
+	}
+
+	const data = await res.json();
+	return finalizeSuggestions((Array.isArray(data) ? data : []).map(normalizeNominatim));
+}
+
+function normalizeNominatim(place) {
+	const a = place.address || {};
+	const housenumber = String(a.house_number || "").trim();
+	const plz = String(a.postcode || "").trim();
+	const stadt = String(
+		a.city ||
+			a.town ||
+			a.village ||
+			a.municipality ||
+			a.city_district ||
+			a.suburb ||
+			""
+	).trim();
+
+	let street = String(a.road || a.pedestrian || a.path || a.footway || "").trim();
+	if (!street && place.class === "highway" && place.name) {
+		street = String(place.name).trim();
+	}
+
+	let streetLine = [street, housenumber].filter(Boolean).join(" ").trim();
+	const type =
+		housenumber || place.addresstype === "building" || place.addresstype === "house"
+			? "house"
+			: place.addresstype || place.type || "";
+	const labelProps = {
+		name: place.name || street,
+		type,
+		street,
+		housenumber,
+		postcode: plz,
+		city: stadt,
+	};
+	const label = buildLabel(labelProps, streetLine, plz, stadt);
+
+	if (!isPlaceOnlyType(type)) {
+		streetLine = resolveStreetLine(streetLine, label, plz, stadt);
+	} else {
+		streetLine = "";
+	}
+
+	const lat = Number.parseFloat(place.lat);
+	const lon = Number.parseFloat(place.lon);
+
+	return {
+		key: [streetLine, plz, stadt, place.osm_type, place.osm_id]
+			.filter(Boolean)
+			.join("|"),
+		label: label !== "Unbekannt" ? label : String(place.display_name || "Unbekannt"),
+		street: streetLine,
+		plz,
+		stadt,
+		type,
+		osm_key: place.class || "",
+		lat: Number.isFinite(lat) ? lat : null,
+		lon: Number.isFinite(lon) ? lon : null,
+	};
 }
 
 async function searchAddresses(q) {
@@ -117,10 +227,44 @@ async function searchAddresses(q) {
 		abortController.abort();
 	}
 	abortController = new AbortController();
+	const signal = abortController.signal;
 	showSuggestionsLoading();
 
 	try {
-		const items = await fetchPhotonSuggestions(q, abortController.signal);
+		let items = [];
+		let usedFallback = false;
+
+		try {
+			items = await fetchPhotonSuggestions(
+				q,
+				withTimeoutSignal(signal, PHOTON_TIMEOUT_MS)
+			);
+		} catch (err) {
+			if (signal.aborted) {
+				return;
+			}
+			usedFallback = true;
+		}
+
+		if (!signal.aborted && (!items.length || usedFallback)) {
+			if (!items.length) {
+				usedFallback = true;
+			}
+			try {
+				const fallbackItems = await fetchNominatimSuggestions(q, signal);
+				if (fallbackItems.length || usedFallback) {
+					items = fallbackItems;
+				}
+			} catch (err) {
+				if (signal.aborted || err.name === "AbortError") {
+					return;
+				}
+				if (!items.length) {
+					throw err;
+				}
+			}
+		}
+
 		currentSuggestions = items;
 		renderSuggestionList(items, q);
 		setStatus(

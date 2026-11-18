@@ -4,6 +4,23 @@ Alle wesentlichen Änderungen an Adressinator werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unreleased]
+
+### Geändert
+
+- CSP `frame-ancestors`: Embed in Office Mage erlaubt (`https://officemage.de`, `https://officemage.kmsw.de`)
+
+## [1.6.1] — 2026-11-18
+
+### Behoben
+
+- Adresssuche findet wieder Treffer, wenn `photon.komoot.io` nicht erreichbar ist (Timeout + Fallback auf Nominatim)
+
+### Geändert
+
+- CSP: `connect-src` um `https://nominatim.openstreetmap.org` ergänzt
+- Debounce der Suche leicht erhöht (Nominatim-freundlicher)
+
 ## [1.6.0] — 2026-05-22
 
 ### Hinzugefügt

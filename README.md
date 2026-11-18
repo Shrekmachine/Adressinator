@@ -1,6 +1,6 @@
 # Adressinator
 
-Statische Web-App zur Adresssuche mit Autovervollständigung für Deutschland. Vorschläge stammen von [Photon](https://github.com/komoot/photon) (OpenStreetMap) — kein API-Schlüssel nötig.
+Statische Web-App zur Adresssuche mit Autovervollständigung für Deutschland. Vorschläge stammen von OpenStreetMap: primär [Photon](https://github.com/komoot/photon) (`photon.komoot.io`), bei Timeout/Ausfall Fallback auf [Nominatim](https://nominatim.org/) — kein API-Schlüssel nötig.
 
 ## Funktionen
 
@@ -51,9 +51,9 @@ Die App setzt eine **CSP** — eine Whitelist, was der Browser laden und ausfüh
 | Richtlinie | Erlaubt |
 |------------|---------|
 | `script-src`, `style-src` | nur eigene Dateien (`js/app.js`, `css/style.css`) |
-| `connect-src` | eigene Origin + `https://photon.komoot.io` (Adresssuche) |
+| `connect-src` | eigene Origin + `https://photon.komoot.io` + `https://nominatim.openstreetmap.org` (Adresssuche) |
 | `img-src` | eigene Origin (Logo) |
-| `frame-ancestors 'none'` | Seite darf nicht in fremde iframes eingebettet werden |
+| `frame-ancestors https://officemage.de https://officemage.kmsw.de` | Embed nur in Office Mage (iframe); sonst blockiert |
 
 **Zwei Varianten** (Inhalt identisch — eine reicht):
 
@@ -65,9 +65,9 @@ Nach dem Upload testen: Seite öffnen, Adresse suchen, kopieren. Bei blockierten
 ## Technik
 
 - Vanilla HTML, CSS und JavaScript (ES-Module)
-- Geocoding: `https://photon.komoot.io/api/`
+- Geocoding: Photon (`https://photon.komoot.io/api/`), Fallback Nominatim (`https://nominatim.openstreetmap.org/search`)
 - Verlauf und Startadressen: `localStorage` im Browser
-- Suche auf Deutschland begrenzt (`bbox`)
+- Suche auf Deutschland begrenzt (Photon: `bbox`, Nominatim: `countrycodes=de`)
 
 ## Hinweise
 
